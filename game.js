@@ -5,8 +5,32 @@ const DEFAULT_COLOR = "#68f1e2";
 const COLORS = ["#68f1e2", "#ff67d8", "#ffc857", "#8c81ff", "#82f06a"];
 const MAX_ENEMIES = 14;
 const HIT_COOLDOWN = 0.7;
-const PICKUP_LIMIT = 10;
-const PICKUP_INTERVAL = 7;
+const MAX_PICKUPS = 20;
+const PICKUP_RESPAWN_SECONDS = 1;
+const ABILITY_CATALOG = [
+  { id: "dash", name: "Ривок", icon: "⚡", cost: 50, cooldown: 8, duration: 0, description: "Стрімко рвись у напрямку руху." },
+  { id: "shield", name: "Щит", icon: "🛡️", cost: 100, cooldown: 18, duration: 5, description: "Не отримуй шкоди 5 секунд." },
+  { id: "magnet", name: "Магніт кубків", icon: "🧲", cost: 100, cooldown: 18, duration: 8, description: "Притягуй кубки 8 секунд." },
+  { id: "wave", name: "Енергетична хвиля", icon: "💥", cost: 150, cooldown: 18, duration: 0, description: "Відкинь і зупини близькі квадрати." },
+  { id: "speed", name: "Прискорення", icon: "👟", cost: 150, cooldown: 18, duration: 7, description: "Рухайся швидше 7 секунд." },
+  { id: "extra-health", name: "Додаткове здоров'я", icon: "❤️", cost: 200, cooldown: 0, duration: 0, description: "Пасивно додає одне серце." },
+  { id: "slow-time", name: "Уповільнення часу", icon: "⏳", cost: 250, cooldown: 20, duration: 7, description: "Сповільни квадрати на 7 секунд." },
+  { id: "double-cups", name: "Подвійні кубки", icon: "✨", cost: 300, cooldown: 24, duration: 10, description: "Подвоюй кубки 10 секунд." }
+];
+const SKIN_CATALOG = [
+  { id: "classic", name: "Класичний", icon: "⚪", cost: 0, colors: ["#ffffff", "#68f1e2", "#188b96"] },
+  { id: "fire", name: "Вогняний", icon: "🔥", cost: 50, colors: ["#fff2a6", "#ff813d", "#d9254b"] },
+  { id: "ice", name: "Крижаний", icon: "❄️", cost: 100, colors: ["#ffffff", "#8beaff", "#3273d2"] },
+  { id: "electric", name: "Електричний", icon: "⚡", cost: 175, colors: ["#ffffff", "#ffe944", "#8d55ff"] },
+  { id: "toxic", name: "Токсичний", icon: "☢️", cost: 250, colors: ["#edff89", "#8cf443", "#238c62"] },
+  { id: "ghost", name: "Привид", icon: "👻", cost: 350, colors: ["#ffffff", "#dceaff", "#9d9be9"] },
+  { id: "rainbow", name: "Веселковий", icon: "🌈", cost: 450, colors: ["#ffffff", "#ff67d8", "#7657ff"] },
+  { id: "diamond", name: "Діамантовий", icon: "💎", cost: 600, colors: ["#ffffff", "#6fffee", "#198cbf"] },
+  { id: "gold-king", name: "Золотий король", icon: "👑", cost: 800, colors: ["#fff8c7", "#ffc13d", "#b66a14"] },
+  { id: "galactic", name: "Галактичний", icon: "🌌", cost: 1100, colors: ["#ffffff", "#c66dff", "#4523a8"] },
+  { id: "shadow", name: "Тіньовий", icon: "🖤", cost: 1500, colors: ["#e5caff", "#53326f", "#171222"] },
+  { id: "legendary", name: "Легендарний", icon: "🔱", cost: 2500, colors: ["#fff6c9", "#ff5fc8", "#575cff"] }
+];
 const MOVEMENT_CODES = {
   KeyW: "w", KeyA: "a", KeyS: "s", KeyD: "d",
   ArrowUp: "arrowup", ArrowDown: "arrowdown", ArrowLeft: "arrowleft", ArrowRight: "arrowright"
@@ -33,6 +57,8 @@ const dom = {
   settingsName: document.querySelector("#settings-name"),
   settingsFeedback: document.querySelector("[data-settings-feedback]"),
   modalBackdrop: document.querySelector("[data-modal-backdrop]"),
+  onlineJoinForm: document.querySelector("[data-online-join-form]"),
+  onlineJoinInput: document.querySelector("#online-room-code-input"),
   joystick: document.querySelector("[data-joystick]"),
   joystickKnob: document.querySelector("[data-joystick-knob]")
 };
@@ -45,11 +71,23 @@ function loadProfile() {
       color: COLORS.includes(saved.color) ? saved.color : DEFAULT_COLOR,
       trophies: Number.isSafeInteger(saved.trophies) && saved.trophies >= 0 ? saved.trophies : 0,
       bestTime: Number.isFinite(saved.bestTime) && saved.bestTime >= 0 ? saved.bestTime : 0,
-      sound: saved.sound !== false
+      sound: saved.sound !== false,
+      ownedAbilities: Array.isArray(saved.ownedAbilities)
+        ? [...new Set(saved.ownedAbilities.filter((id) => ABILITY_CATALOG.some((item) => item.id === id)))]
+        : [],
+      equippedAbility: ABILITY_CATALOG.some((item) => item.id === saved.equippedAbility && saved.ownedAbilities?.includes(item.id))
+        ? saved.equippedAbility
+        : null,
+      ownedSkins: Array.isArray(saved.ownedSkins)
+        ? [...new Set(["classic", ...saved.ownedSkins.filter((id) => SKIN_CATALOG.some((item) => item.id === id))])]
+        : ["classic"],
+      selectedSkin: SKIN_CATALOG.some((item) => item.id === saved.selectedSkin && saved.ownedSkins?.includes(item.id))
+        ? saved.selectedSkin
+        : "classic"
     };
   } catch (error) {
     console.warn("Не вдалося прочитати збережені дані арени.", error);
-    return { name: "Шарік", color: DEFAULT_COLOR, trophies: 0, bestTime: 0, sound: true };
+    return { name: "Шарік", color: DEFAULT_COLOR, trophies: 0, bestTime: 0, sound: true, ownedAbilities: [], equippedAbility: null, ownedSkins: ["classic"], selectedSkin: "classic" };
   }
 }
 
@@ -63,7 +101,13 @@ const game = {
   elapsed: 0,
   runTrophies: 0,
   spawnTimer: 1.8,
-  pickupTimer: 2,
+  pickupTimer: 0,
+  round: 1,
+  abilityTimer: 0,
+  abilityCooldown: 0,
+  shieldTimer: 0,
+  abilityUsed: null,
+  shopTab: "abilities",
   keys: new Set(),
   joystick: { active: false, pointerId: null, x: 0, y: 0 },
   width: 0,
@@ -74,7 +118,12 @@ const game = {
   cameraY: 0,
   lastFrame: 0,
   toastTimer: 0,
-  audio: null
+  audio: null,
+  onlineMode: false,
+  onlineWorld: null,
+  onlinePlayers: [],
+  onlineSelfId: null,
+  onlineAccount: null
 };
 
 function saveProfile() {
@@ -86,6 +135,116 @@ function saveProfile() {
   }
   updateProfileUI();
 }
+
+function openOnlineModal() {
+  openModal("online");
+  dom.onlineJoinForm?.classList.add("is-hidden");
+  if (window.onlineClient) {
+    window.onlineClient.runAction(() => window.onlineClient.connect());
+  }
+}
+
+function startOnlineArena(message) {
+  closeModal();
+  dom.overlay.classList.add("is-hidden");
+  game.onlineMode = true;
+  game.onlineWorld = message.world;
+  game.onlineSelfId = window.onlineClient?.account?.playerId || null;
+  game.onlinePlayers = [];
+  game.enemies = [];
+  game.pickups = [];
+  game.particles = [];
+  game.elapsed = 0;
+  game.round = 1;
+  game.runTrophies = 0;
+  game.player.x = message.world.width / 2;
+  game.player.y = message.world.height / 2;
+  game.player.hp = 3;
+  game.player.vx = 0;
+  game.player.vy = 0;
+  game.player.invulnerable = 0;
+  showScreen(dom.game);
+  resizeCanvas();
+  setGameState("playing");
+  game.lastFrame = performance.now();
+  requestAnimationFrame(gameLoop);
+}
+
+function applyOnlineSnapshot(snapshot) {
+  if (!game.onlineMode || !snapshot?.self) return;
+  game.onlineSelfId = snapshot.selfId;
+  game.onlineWorld = snapshot.world;
+  game.worldWidth = snapshot.world.width;
+  game.worldHeight = snapshot.world.height;
+  game.elapsed = snapshot.elapsed;
+  game.round = snapshot.round;
+  game.onlinePlayers = snapshot.players;
+  game.enemies = snapshot.enemies;
+  game.pickups = snapshot.pickups;
+  game.player.x = snapshot.self.x;
+  game.player.y = snapshot.self.y;
+  game.player.vx = snapshot.self.vx;
+  game.player.vy = snapshot.self.vy;
+  game.player.hp = snapshot.self.hp;
+  game.player.radius = 16;
+  game.player.invulnerable = snapshot.self.invulnerable;
+  game.shieldTimer = snapshot.self.shieldTimer;
+  game.abilityCooldown = snapshot.self.abilityCooldown;
+  game.abilityTimer = snapshot.self.effectTimer;
+  game.abilityUsed = snapshot.self.abilityUsed;
+  game.runTrophies = snapshot.self.cups;
+  updateCamera();
+  updateHud();
+}
+
+function finishOnlineMatch(result, playerResult) {
+  const winner = result.winner?.name;
+  const personal = playerResult
+    ? `Ти зібрав ${playerResult.cups} 🏆. Онлайн-баланс: ${playerResult.profile.balance} 🏆.`
+    : "Твої результати збережені на сервері.";
+  game.elapsed = result.elapsed;
+  game.state = "gameover";
+  game.keys.clear();
+  resetJoystick();
+  showOverlay({
+    icon: playerResult?.won ? "🏆" : "🎮",
+    kicker: "ОНЛАЙН-МАТЧ ЗАВЕРШЕНО",
+    title: playerResult?.won ? "ТИ ПЕРЕМІГ!" : winner ? `${winner} ПЕРЕМІГ` : "МАТЧ ЗАВЕРШЕНО",
+    message: personal,
+    summary: `ЧАС: ${formatTime(result.elapsed)} · НАГОРОДУ ПІДТВЕРДИВ СЕРВЕР`,
+    actions: [
+      { label: "ГОЛОВНЕ МЕНЮ", action: "menu", primary: true },
+      { label: "ГРАТИ СОЛО", action: "restart", secondary: true }
+    ]
+  });
+}
+
+function getOnlineInput() {
+  if (!game.onlineMode || game.state !== "playing") return { x: 0, y: 0 };
+  let x = (game.keys.has("d") || game.keys.has("arrowright") ? 1 : 0) - (game.keys.has("a") || game.keys.has("arrowleft") ? 1 : 0);
+  let y = (game.keys.has("s") || game.keys.has("arrowdown") ? 1 : 0) - (game.keys.has("w") || game.keys.has("arrowup") ? 1 : 0);
+  x += game.joystick.x;
+  y += game.joystick.y;
+  const length = Math.hypot(x, y);
+  if (length > 1) { x /= length; y /= length; }
+  return { x, y };
+}
+
+window.startOnlineArena = startOnlineArena;
+window.applyOnlineSnapshot = applyOnlineSnapshot;
+window.finishOnlineMatch = finishOnlineMatch;
+window.getOnlineInput = getOnlineInput;
+window.getArenaProfile = () => ({ name: profile.name, color: profile.color });
+window.getOnlineMode = () => game.onlineMode;
+window.applyOnlineProfile = (account) => {
+  game.onlineAccount = account;
+  updateHud();
+};
+window.renderShopForOnline = () => {
+  if (!document.querySelector('[data-modal="shop"]').classList.contains("is-hidden")) renderShop();
+};
+window.showArenaToast = (message) => showToast(message);
+window.openOnlineModal = openOnlineModal;
 
 function updateProfileUI() {
   document.querySelectorAll("[data-total-trophies]").forEach((node) => { node.textContent = String(profile.trophies); });
@@ -106,6 +265,10 @@ function updateProfileUI() {
   }
   const hudName = document.querySelector("[data-hud-name]");
   if (hudName) hudName.textContent = profile.name;
+  updateHud();
+  if (!dom.modalBackdrop.classList.contains("is-hidden") && !document.querySelector('[data-modal="shop"]').classList.contains("is-hidden")) {
+    renderShop();
+  }
 }
 
 function setNameFrom(input, feedback) {
@@ -122,6 +285,7 @@ function setNameFrom(input, feedback) {
   dom.nameFeedback.textContent = "";
   dom.settingsFeedback.textContent = "";
   saveProfile();
+  if (window.onlineClient?.isConnected) window.onlineClient.send({ type: "profile", name, color: profile.color });
   if (game.state === "playing" || game.state === "paused") showToast(`Тепер ти — ${profile.name}!`);
   return true;
 }
@@ -129,7 +293,9 @@ function setNameFrom(input, feedback) {
 function setColor(color) {
   if (!COLORS.includes(color)) return;
   profile.color = color;
+  profile.selectedSkin = "classic";
   saveProfile();
+  if (window.onlineClient?.isConnected) window.onlineClient.send({ type: "profile", name: profile.name, color });
 }
 
 function showScreen(screen) {
@@ -142,6 +308,7 @@ function openModal(name) {
     modal.classList.toggle("is-hidden", modal.dataset.modal !== name);
   });
   if (name === "settings") dom.settingsName.value = profile.name;
+  if (name === "shop") renderShop();
   const firstButton = document.querySelector(`[data-modal="${name}"] button`);
   firstButton?.focus();
 }
@@ -157,16 +324,31 @@ function setGameState(state) {
 }
 
 function beginRun() {
+  if (game.onlineMode) {
+    window.onlineClient?.leaveRoom();
+    game.onlineMode = false;
+    game.onlinePlayers = [];
+  }
   closeModal();
   game.runTrophies = 0;
   game.particles = [];
   game.enemies = [];
   game.pickups = [];
   game.elapsed = 0;
+  game.round = 1;
   game.spawnTimer = 1.4;
-  game.pickupTimer = 1;
+  game.pickupTimer = 0;
+  game.abilityTimer = 0;
+  game.abilityCooldown = 0;
+  game.shieldTimer = 0;
+  game.abilityUsed = null;
   game.keys.clear();
+  game.onlineMode = false;
+  game.onlinePlayers = [];
+  game.onlineSelfId = null;
+  game.onlineWorld = null;
   game.player.hp = 3;
+  game.player.hp = maxPlayerHealth();
   game.player.vx = 0;
   game.player.vy = 0;
   game.player.invulnerable = 0;
@@ -177,9 +359,11 @@ function beginRun() {
   game.player.x = center.x;
   game.player.y = center.y;
   updateCamera();
-  for (let i = 0; i < 3; i += 1) spawnPickup();
-  for (let i = 0; i < 2; i += 1) spawnEnemy();
   setGameState("playing");
+  for (let i = 0; i < startingPickupTarget(); i += 1) {
+    if (!spawnPickup()) break;
+  }
+  for (let i = 0; i < 2; i += 1) spawnEnemy();
   game.lastFrame = performance.now();
   updateHud();
   requestAnimationFrame(gameLoop);
@@ -194,6 +378,133 @@ function getDifficulty() {
     maxEnemies: MAX_ENEMIES,
     spawnInterval: 2.3
   };
+}
+
+function startingPickupTarget() {
+  return Math.min(10 + Math.floor(game.elapsed / 60), MAX_PICKUPS);
+}
+
+function maxPlayerHealth() {
+  if (game.onlineMode && game.onlineAccount) {
+    return 3 + (game.onlineAccount.ownedAbilities.includes("extra-health") ? 1 : 0);
+  }
+  return 3 + (profile.ownedAbilities.includes("extra-health") ? 1 : 0);
+}
+
+function getEquippedAbility() {
+  if (game.onlineMode && game.onlineAccount) {
+    return ABILITY_CATALOG.find((ability) => ability.id === game.onlineAccount.equippedAbility) || null;
+  }
+  return ABILITY_CATALOG.find((ability) => ability.id === profile.equippedAbility) || null;
+}
+
+function getSelectedSkin() {
+  if (game.onlineMode && game.onlineAccount) {
+    return SKIN_CATALOG.find((skin) => skin.id === game.onlineAccount.selectedSkin) || SKIN_CATALOG[0];
+  }
+  return SKIN_CATALOG.find((skin) => skin.id === profile.selectedSkin) || SKIN_CATALOG[0];
+}
+
+function renderShop() {
+  const balance = document.querySelector("[data-shop-balance]");
+  const list = document.querySelector("[data-shop-items]");
+  const hint = document.querySelector("[data-shop-hint]");
+  const walletLabel = document.querySelector("[data-shop-wallet-label]");
+  if (!balance || !list || !hint) return;
+  const remoteAccount = window.onlineClient?.isConnected ? window.onlineClient.account : null;
+  const shopBalance = remoteAccount ? remoteAccount.balance : profile.trophies;
+  balance.textContent = String(shopBalance);
+  if (walletLabel) walletLabel.textContent = remoteAccount ? "ОНЛАЙН-БАЛАНС:" : "СОЛО-БАЛАНС:";
+  const isAbilities = game.shopTab === "abilities";
+  const catalog = isAbilities ? ABILITY_CATALOG : SKIN_CATALOG;
+  hint.textContent = isAbilities
+    ? "Купи здібність, щоб розблокувати її. Натисни SPACE або кнопку на екрані під час гри."
+    : "Купи скін і споряджай його. Класичний скін підлаштовується під вибраний колір.";
+  if (remoteAccount) {
+    hint.textContent += ` Соло-баланс (${profile.trophies} 🏆) збережений окремо.`;
+  }
+  document.querySelectorAll("[data-shop-tab]").forEach((tab) => {
+    const selected = tab.dataset.shopTab === game.shopTab;
+    tab.classList.toggle("is-active", selected);
+    tab.setAttribute("aria-selected", String(selected));
+  });
+  list.replaceChildren();
+  catalog.forEach((item) => {
+    const ownedAbilities = remoteAccount ? remoteAccount.ownedAbilities : profile.ownedAbilities;
+    const ownedSkins = remoteAccount ? remoteAccount.ownedSkins : profile.ownedSkins;
+    const owned = isAbilities ? ownedAbilities.includes(item.id) : ownedSkins.includes(item.id);
+    const equipped = isAbilities
+      ? (remoteAccount ? remoteAccount.equippedAbility : profile.equippedAbility) === item.id
+      : (remoteAccount ? remoteAccount.selectedSkin : profile.selectedSkin) === item.id;
+    const row = document.createElement("div");
+    row.className = "shop-item";
+    const icon = document.createElement("span");
+    icon.className = "shop-item-icon";
+    icon.textContent = item.icon;
+    const copy = document.createElement("span");
+    copy.className = "shop-item-copy";
+    const title = document.createElement("strong");
+    title.textContent = item.name;
+    const description = document.createElement("small");
+    description.textContent = isAbilities ? item.description : item.cost === 0 ? "Безкоштовний класичний вигляд." : `Ефектний скін для твоєї кульки.`;
+    copy.append(title, description);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `shop-item-button${!owned && shopBalance >= item.cost ? " is-affordable" : ""}${equipped ? " is-equipped" : ""}`;
+    button.dataset.shopItem = item.id;
+    button.dataset.shopType = isAbilities ? "ability" : "skin";
+    if (equipped) {
+      button.textContent = isAbilities ? "ОБРАНО" : "ОДЯГНУТО";
+      button.disabled = true;
+    } else if (owned) {
+      button.textContent = isAbilities ? "ОБРАТИ" : "ОДЯГНУТИ";
+    } else {
+      button.textContent = item.cost === 0 ? "БЕЗКОШТОВНО" : `${item.cost} 🏆`;
+      button.disabled = shopBalance < item.cost;
+    }
+    row.append(icon, copy, button);
+    list.append(row);
+  });
+}
+
+function purchaseOrEquip(itemType, itemId) {
+  const catalog = itemType === "ability" ? ABILITY_CATALOG : SKIN_CATALOG;
+  const item = catalog.find((entry) => entry.id === itemId);
+  if (!item) return;
+  if (window.onlineClient?.isConnected) {
+    const owned = itemType === "ability"
+      ? window.onlineClient.account.ownedAbilities.includes(item.id)
+      : window.onlineClient.account.ownedSkins.includes(item.id);
+    window.onlineClient.purchaseOrEquip(itemType, itemId, owned ? "equip" : "purchase")
+      .then(() => {
+        showToast(owned ? `${item.name} споряджено` : `${item.name} придбано`);
+        renderShop();
+      })
+      .catch((error) => {
+        showToast(error.message);
+        window.onlineClient.showError?.(error.message);
+      });
+    return;
+  }
+  const ownedList = itemType === "ability" ? profile.ownedAbilities : profile.ownedSkins;
+  const owned = ownedList.includes(item.id);
+  if (!owned) {
+    if (profile.trophies < item.cost) {
+      showToast("Не вистачає кубків");
+      return;
+    }
+    profile.trophies -= item.cost;
+    ownedList.push(item.id);
+  }
+  if (itemType === "ability") {
+    profile.equippedAbility = item.id;
+    if (item.id === "extra-health") game.player.hp = Math.min(maxPlayerHealth(), game.player.hp + 1);
+  } else {
+    profile.selectedSkin = item.id;
+  }
+  saveProfile();
+  showToast(owned ? `${item.name} споряджено` : `${item.name} придбано`);
+  renderShop();
 }
 
 function chooseEnemyType() {
@@ -256,7 +567,7 @@ function spawnEnemy() {
 }
 
 function spawnPickup() {
-  if (game.pickups.length >= PICKUP_LIMIT || !game.worldWidth || !game.worldHeight) return;
+  if (game.state !== "playing" || game.pickups.length >= MAX_PICKUPS || !game.worldWidth || !game.worldHeight) return false;
   const radius = 11;
   const padding = radius + 12;
   let best = null;
@@ -279,17 +590,20 @@ function spawnPickup() {
     ), Infinity);
     const nearestPickupGap = game.pickups.reduce((gap, pickup) => Math.min(
       gap,
-      Math.hypot(x - pickup.x, y - pickup.y) - radius - pickup.radius
+      Math.hypot(x - pickup.x, y - pickup.y) - radius - pickup.radius - 8
     ), Infinity);
-    const score = Math.min(distanceFromPlayer - 75, nearestEnemyGap, nearestPickupGap);
+    const score = Math.min(distanceFromPlayer - 95, nearestEnemyGap - 8, nearestPickupGap);
     if (score > bestScore) {
       bestScore = score;
       best = { x, y };
     }
-    if (score >= 3) break;
+    if (score >= 0) break;
   }
-  if (!best) return;
-  game.pickups.push({ x: best.x, y: best.y, radius, phase: Math.random() * Math.PI * 2 });
+  if (!best || bestScore < 0) return false;
+  const roll = Math.random();
+  const value = roll < .035 ? 5 : roll < .2 ? 3 : 1;
+  game.pickups.push({ x: best.x, y: best.y, radius, value, phase: Math.random() * Math.PI * 2 });
+  return true;
 }
 
 function awardTrophies(amount, reason) {
@@ -299,6 +613,79 @@ function awardTrophies(amount, reason) {
   saveProfile();
   showToast(`+${amount} 🏆  ${reason}`);
   playSound("trophy");
+}
+
+function useEquippedAbility() {
+  if (game.state !== "playing") return;
+  if (game.onlineMode) {
+    const ability = getEquippedAbility();
+    if (!ability) {
+      showToast("Спорядь онлайн-здібність у магазині");
+      return;
+    }
+    if (ability.id === "extra-health") {
+      showToast("Додаткове здоров'я діє постійно");
+      return;
+    }
+    if (game.abilityCooldown > 0) {
+      showToast(`Зачекай ${game.abilityCooldown.toFixed(1)} с`);
+      return;
+    }
+    window.onlineClient?.ability();
+    return;
+  }
+  const ability = getEquippedAbility();
+  if (!ability) {
+    showToast("Обери здібність у магазині");
+    return;
+  }
+  if (ability.id === "extra-health") {
+    showToast("Додаткове здоров'я діє постійно");
+    return;
+  }
+  if (game.abilityCooldown > 0) {
+    showToast(`Зачекай ${game.abilityCooldown.toFixed(1)} с`);
+    return;
+  }
+  game.abilityCooldown = ability.cooldown;
+  game.abilityUsed = ability.id;
+  game.abilityTimer = ability.duration;
+  const player = game.player;
+  if (ability.id === "dash") {
+    let dx = (game.keys.has("d") || game.keys.has("arrowright") ? 1 : 0) - (game.keys.has("a") || game.keys.has("arrowleft") ? 1 : 0);
+    let dy = (game.keys.has("s") || game.keys.has("arrowdown") ? 1 : 0) - (game.keys.has("w") || game.keys.has("arrowup") ? 1 : 0);
+    dx += game.joystick.x;
+    dy += game.joystick.y;
+    let length = Math.hypot(dx, dy);
+    if (length < .1) {
+      dx = player.vx;
+      dy = player.vy;
+      length = Math.hypot(dx, dy);
+    }
+    if (length < .1) { dx = 1; dy = 0; length = 1; }
+    player.vx = dx / length * 620;
+    player.vy = dy / length * 620;
+    player.invulnerable = Math.max(player.invulnerable, .35);
+    makeBurst(player.x, player.y, "#68f1e2", 20);
+  } else if (ability.id === "shield") {
+    game.shieldTimer = ability.duration;
+    makeBurst(player.x, player.y, "#7ddcff", 18);
+  } else if (ability.id === "wave") {
+    for (const enemy of game.enemies) {
+      const dx = enemy.x - player.x;
+      const dy = enemy.y - player.y;
+      const distance = Math.max(1, Math.hypot(dx, dy));
+      if (distance > 280) continue;
+      enemy.vx += dx / distance * 420;
+      enemy.vy += dy / distance * 420;
+      enemy.stunTimer = 1.1;
+      makeBurst(enemy.x, enemy.y, "#ff67d8", 5);
+    }
+    makeBurst(player.x, player.y, "#ff67d8", 34);
+  }
+  showToast(`${ability.icon} ${ability.name}!`);
+  updateHud();
+  playSound("ability");
 }
 
 function gameOver() {
@@ -327,6 +714,10 @@ function gameOver() {
 
 function pauseGame() {
   if (game.state !== "playing") return;
+  if (game.onlineMode) {
+    showToast("В онлайн-матчі пауза недоступна");
+    return;
+  }
   setGameState("paused");
   game.keys.clear();
   resetJoystick();
@@ -390,9 +781,18 @@ function showOverlay({ icon = "🏆", kicker = "", title = "", message = "", sum
 
 function updateGame(dt) {
   if (game.state !== "playing") return;
+  const previousRound = game.round;
   game.elapsed += dt;
+  game.round = Math.floor(game.elapsed / 60) + 1;
   const difficulty = getDifficulty();
+  if (game.round > previousRound) {
+    showToast(`Раунд ${game.round}! Швидкість +3%, кубків на мапі більше.`);
+    playSound("start");
+  }
   const p = game.player;
+  game.abilityCooldown = Math.max(0, game.abilityCooldown - dt);
+  game.abilityTimer = Math.max(0, game.abilityTimer - dt);
+  game.shieldTimer = Math.max(0, game.shieldTimer - dt);
   let inputX = 0;
   let inputY = 0;
   if (game.keys.has("a") || game.keys.has("arrowleft")) inputX -= 1;
@@ -403,7 +803,7 @@ function updateGame(dt) {
   inputY += game.joystick.y;
   const inputLength = Math.hypot(inputX, inputY);
   if (inputLength > 1) { inputX /= inputLength; inputY /= inputLength; }
-  const playerSpeed = 242;
+  const playerSpeed = 242 * (game.abilityUsed === "speed" && game.abilityTimer > 0 ? 1.75 : 1);
   const acceleration = Math.min(1, dt * 12);
   p.vx += (inputX * playerSpeed - p.vx) * acceleration;
   p.vy += (inputY * playerSpeed - p.vy) * acceleration;
@@ -423,10 +823,14 @@ function updateGame(dt) {
     spawnEnemy();
     game.spawnTimer = difficulty.spawnInterval;
   }
-  game.pickupTimer -= dt;
-  if (game.pickupTimer <= 0) {
-    spawnPickup();
-    game.pickupTimer = PICKUP_INTERVAL;
+  const pickupTarget = startingPickupTarget();
+  if (game.pickups.length < pickupTarget) {
+    game.pickupTimer = Math.max(0, game.pickupTimer - dt);
+    if (game.pickupTimer === 0) {
+      game.pickupTimer = spawnPickup() ? PICKUP_RESPAWN_SECONDS : .5;
+    }
+  } else {
+    game.pickupTimer = 0;
   }
 
   let hitEnemy = null;
@@ -435,7 +839,7 @@ function updateGame(dt) {
   }
   separateEnemies();
   for (const enemy of game.enemies) {
-    if (p.invulnerable <= 0 && collidesCircleSquare(p.x, p.y, p.radius, enemy.x, enemy.y, enemy.size)) {
+    if (p.invulnerable <= 0 && game.shieldTimer <= 0 && collidesCircleSquare(p.x, p.y, p.radius, enemy.x, enemy.y, enemy.size)) {
       hitEnemy = enemy;
       break;
     }
@@ -444,9 +848,21 @@ function updateGame(dt) {
   for (let i = game.pickups.length - 1; i >= 0; i -= 1) {
     const pickup = game.pickups[i];
     pickup.phase += dt * 3.5;
+    if (game.abilityUsed === "magnet" && game.abilityTimer > 0) {
+      const dx = p.x - pickup.x;
+      const dy = p.y - pickup.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance < 320 && distance > 0) {
+        const pull = Math.min(distance, 360 * dt);
+        pickup.x += dx / distance * pull;
+        pickup.y += dy / distance * pull;
+      }
+    }
     if (Math.hypot(p.x - pickup.x, p.y - pickup.y) <= p.radius + pickup.radius) {
       game.pickups.splice(i, 1);
-      awardTrophies(1, "кубок зібрано");
+      const value = pickup.value * (game.abilityUsed === "double-cups" && game.abilityTimer > 0 ? 2 : 1);
+      awardTrophies(value, value === 1 ? "кубок зібрано" : `кубок ×${value}`);
+      game.pickupTimer = PICKUP_RESPAWN_SECONDS;
       makeBurst(pickup.x, pickup.y, "#ffc857", 14);
     }
   }
@@ -472,7 +888,20 @@ function updateEnemy(enemy, dt, difficulty) {
       enemy.dashY = dirY;
     }
   }
-  const topSpeed = enemy.speed * difficulty.speed * (enemy.type === "dash" && enemy.dashTime > 0 ? 2.15 : 1);
+  enemy.stunTimer = Math.max(0, (enemy.stunTimer || 0) - dt);
+  if (enemy.stunTimer > 0) {
+    enemy.x += enemy.vx * dt;
+    enemy.y += enemy.vy * dt;
+    enemy.vx *= Math.max(0, 1 - dt * 3);
+    enemy.vy *= Math.max(0, 1 - dt * 3);
+    enemy.x = clamp(enemy.x, enemy.size / 2 + 4, game.worldWidth - enemy.size / 2 - 4);
+    enemy.y = clamp(enemy.y, enemy.size / 2 + 4, game.worldHeight - enemy.size / 2 - 4);
+    enemy.hitFlash = Math.max(0, enemy.hitFlash - dt);
+    enemy.phase += dt * 2;
+    return;
+  }
+  const slowFactor = game.abilityUsed === "slow-time" && game.abilityTimer > 0 ? .42 : 1;
+  const topSpeed = enemy.speed * difficulty.speed * slowFactor * (enemy.type === "dash" && enemy.dashTime > 0 ? 2.15 : 1);
   const steer = Math.min(1, dt * 3.1);
   const targetX = enemy.type === "dash" && enemy.dashTime > 0 ? enemy.dashX * topSpeed : dirX * topSpeed;
   const targetY = enemy.type === "dash" && enemy.dashTime > 0 ? enemy.dashY * topSpeed : dirY * topSpeed;
@@ -615,7 +1044,16 @@ function drawGame() {
     ctx.fill();
   });
   ctx.globalAlpha = 1;
-  drawPlayer(ctx, game.player.x - game.cameraX, game.player.y - game.cameraY);
+  if (game.onlineMode) {
+    for (const player of game.onlinePlayers) {
+      if (!player.alive || player.id === game.onlineSelfId) continue;
+      drawPlayer(ctx, player.x - game.cameraX, player.y - game.cameraY, player, player);
+    }
+    const self = game.onlinePlayers.find((player) => player.id === game.onlineSelfId);
+    if (self?.alive) drawPlayer(ctx, game.player.x - game.cameraX, game.player.y - game.cameraY, game.player, self);
+  } else {
+    drawPlayer(ctx, game.player.x - game.cameraX, game.player.y - game.cameraY);
+  }
   drawMinimap();
 }
 
@@ -679,6 +1117,16 @@ function drawMinimap() {
     ctx.arc(pickup.x * scaleX, pickup.y * scaleY, 1.8, 0, Math.PI * 2);
     ctx.fill();
   }
+  if (game.onlineMode) {
+    for (const player of game.onlinePlayers) {
+      if (!player.alive) continue;
+      ctx.fillStyle = player.color || "#68f1e2";
+      ctx.beginPath();
+      ctx.arc(player.x * scaleX, player.y * scaleY, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return;
+  }
   ctx.fillStyle = profile.color;
   ctx.beginPath();
   ctx.arc(game.player.x * scaleX, game.player.y * scaleY, 3, 0, Math.PI * 2);
@@ -687,34 +1135,44 @@ function drawMinimap() {
 
 function drawPickup(ctx, pickup, x, y) {
   const bob = Math.sin(pickup.phase) * 2;
+  const color = pickup.value === 5 ? "#ffdf61" : pickup.value === 3 ? "#c18aff" : "#ffc857";
+  const size = pickup.value === 5 ? 14 : pickup.value === 3 ? 12 : 10;
   ctx.save();
   ctx.translate(x, y + bob);
-  ctx.shadowColor = "#ffc857";
-  ctx.shadowBlur = 17;
-  ctx.fillStyle = "rgba(255,200,87,.2)";
+  ctx.shadowColor = color;
+  ctx.shadowBlur = pickup.value === 5 ? 22 : 17;
+  ctx.fillStyle = `${color}33`;
   ctx.beginPath();
   ctx.arc(0, 0, pickup.radius + 3, 0, Math.PI * 2);
   ctx.fill();
   ctx.shadowBlur = 9;
-  ctx.strokeStyle = "#ffe59a";
-  ctx.fillStyle = "#ffc857";
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = pickup.value === 5 ? 2.5 : 2;
   ctx.beginPath();
-  ctx.moveTo(-7, -7);
-  ctx.lineTo(7, -7);
-  ctx.lineTo(5, 1);
-  ctx.quadraticCurveTo(0, 7, -5, 1);
+  ctx.moveTo(-size * .55, -size * .55);
+  ctx.lineTo(size * .55, -size * .55);
+  ctx.lineTo(size * .4, size * .08);
+  ctx.quadraticCurveTo(0, size * .55, -size * .4, size * .08);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
   ctx.beginPath();
-  ctx.arc(-7, -3, 4, Math.PI * .5, Math.PI * 1.5);
-  ctx.arc(7, -3, 4, -Math.PI * .5, Math.PI * .5);
+  ctx.arc(-size * .55, -size * .24, size * .28, Math.PI * .5, Math.PI * 1.5);
+  ctx.arc(size * .55, -size * .24, size * .28, -Math.PI * .5, Math.PI * .5);
   ctx.stroke();
   ctx.shadowBlur = 4;
   ctx.fillStyle = "#fff1bc";
-  ctx.fillRect(-1, 2, 2, 4);
-  ctx.fillRect(-4, 7, 8, 2);
+  ctx.fillRect(-1, size * .15, 2, size * .3);
+  ctx.fillRect(-size * .35, size * .53, size * .7, 2);
+  if (pickup.value > 1) {
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 7px DM Mono, monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText(`×${pickup.value}`, 0, size * .69);
+  }
   ctx.restore();
 }
 
@@ -736,31 +1194,48 @@ function drawEnemy(ctx, enemy, x = enemy.x, y = enemy.y) {
   ctx.restore();
 }
 
-function drawPlayer(ctx, x = game.player.x, y = game.player.y) {
-  const p = game.player;
-  if (p.invulnerable > 0 && Math.floor(p.invulnerable * 14) % 2 === 0) return;
+function drawPlayer(ctx, x = game.player.x, y = game.player.y, player = game.player, appearance = null) {
+  const isLocal = appearance === null;
+  const isShielded = isLocal ? game.shieldTimer > 0 : player.shieldTimer > 0;
+  if (!isShielded && player.invulnerable > 0 && Math.floor(player.invulnerable * 14) % 2 === 0) return;
+  const skin = appearance
+    ? SKIN_CATALOG.find((entry) => entry.id === appearance.skin) || SKIN_CATALOG[0]
+    : getSelectedSkin();
+  const playerColor = appearance?.color || profile.color;
+  const skinColors = skin.id === "classic"
+    ? ["#ffffff", playerColor, shadeColor(playerColor, -38)]
+    : skin.id === "rainbow"
+      ? ["#ffffff", `hsl(${(game.elapsed * 100) % 360} 95% 67%)`, `hsl(${((game.elapsed * 100) + 90) % 360} 78% 42%)`]
+      : skin.colors;
   ctx.save();
   ctx.translate(x, y);
-  ctx.shadowColor = p.invulnerable > 0 ? "#ff596f" : profile.color;
-  ctx.shadowBlur = 24;
-  const gradient = ctx.createRadialGradient(-5, -7, 2, 0, 0, p.radius);
-  gradient.addColorStop(0, "#ffffff");
-  gradient.addColorStop(.2, profile.color);
-  gradient.addColorStop(1, shadeColor(profile.color, -38));
-  ctx.fillStyle = p.invulnerable > 0 ? "#ff596f" : gradient;
+  ctx.shadowColor = isShielded ? "#7ddcff" : skinColors[1];
+  ctx.shadowBlur = isShielded ? 32 : 24;
+  const gradient = ctx.createRadialGradient(-5, -7, 2, 0, 0, player.radius || 16);
+  gradient.addColorStop(0, skinColors[0]);
+  gradient.addColorStop(.43, skinColors[1]);
+  gradient.addColorStop(1, skinColors[2]);
+  ctx.fillStyle = player.invulnerable > 0 && !isShielded ? "#ff596f" : gradient;
   ctx.beginPath();
-  ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
+  ctx.arc(0, 0, player.radius || 16, 0, Math.PI * 2);
   ctx.fill();
   ctx.shadowBlur = 0;
-  ctx.strokeStyle = "rgba(255,255,255,.75)";
-  ctx.lineWidth = 1.4;
+  ctx.strokeStyle = isShielded ? "#b8ecff" : "rgba(255,255,255,.75)";
+  ctx.lineWidth = isShielded ? 2.4 : 1.4;
   ctx.stroke();
+  if (isShielded) {
+    ctx.strokeStyle = "rgba(125,220,255,.66)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, (player.radius || 16) + 7 + Math.sin(game.elapsed * 8) * 1.5, 0, Math.PI * 2);
+    ctx.stroke();
+  }
   ctx.fillStyle = "rgba(10,18,38,.75)";
   ctx.beginPath(); ctx.arc(-5, -2, 2, 0, Math.PI * 2); ctx.arc(5, -2, 2, 0, Math.PI * 2); ctx.fill();
   ctx.strokeStyle = "rgba(10,18,38,.8)";
   ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, 2, 4, .2, Math.PI - .2); ctx.stroke();
 
-  const name = profile.name;
+  const name = appearance?.name || profile.name;
   const fontSize = clamp(13 - Math.max(0, name.length - 7) * .45, 8, 13);
   ctx.font = `700 ${fontSize}px Manrope, sans-serif`;
   ctx.textAlign = "center";
@@ -768,9 +1243,9 @@ function drawPlayer(ctx, x = game.player.x, y = game.player.y) {
   ctx.lineJoin = "round";
   ctx.lineWidth = 4;
   ctx.strokeStyle = "rgba(5,8,20,.95)";
-  ctx.strokeText(name, 0, -p.radius - 7, 150);
+  ctx.strokeText(name, 0, -(player.radius || 16) - 7, 150);
   ctx.fillStyle = "#fff";
-  ctx.fillText(name, 0, -p.radius - 7, 150);
+  ctx.fillText(name, 0, -(player.radius || 16) - 7, 150);
   ctx.restore();
 }
 
@@ -783,7 +1258,14 @@ function gameLoop(timestamp) {
   if (game.state !== "playing") return;
   const dt = Math.min(Math.max((timestamp - game.lastFrame) / 1000, 0), .05);
   game.lastFrame = timestamp;
-  updateGame(dt);
+  if (game.onlineMode) {
+    updateParticles(dt);
+    game.toastTimer = Math.max(0, game.toastTimer - dt);
+    if (game.toastTimer === 0) dom.toast.textContent = "";
+    updateHud();
+  } else {
+    updateGame(dt);
+  }
   drawGame();
   if (game.state === "playing") requestAnimationFrame(gameLoop);
 }
@@ -793,20 +1275,40 @@ function updateHud() {
   if (time) time.textContent = formatTime(game.elapsed);
   const hp = document.querySelector("[data-hud-hp]");
   if (hp) {
-    hp.textContent = `${"♥".repeat(game.player.hp)}${"♡".repeat(3 - game.player.hp)}`;
-    hp.setAttribute("aria-label", `Здоров'я: ${game.player.hp} з 3`);
+    const maxHealth = maxPlayerHealth();
+    hp.textContent = `${"♥".repeat(game.player.hp)}${"♡".repeat(maxHealth - game.player.hp)}`;
+    hp.setAttribute("aria-label", `Здоров'я: ${game.player.hp} з ${maxHealth}`);
   }
   const runCups = document.querySelector("[data-hud-run-cups]");
   if (runCups) runCups.textContent = String(game.runTrophies);
   const total = document.querySelector("[data-hud-total-cups]");
-  if (total) total.textContent = String(profile.trophies);
+  if (total) total.textContent = String(game.onlineMode && game.onlineAccount ? game.onlineAccount.balance : profile.trophies);
   const speed = document.querySelector("[data-hud-speed]");
   const speedPercent = Math.round(getDifficulty().speed * 100);
   if (speed) speed.textContent = `${speedPercent}%`;
   const meter = document.querySelector("[data-difficulty-meter]");
   if (meter) meter.style.width = `${Math.min(100, Math.max(8, (speedPercent - 100) / 4))}%`;
   const label = document.querySelector("[data-difficulty-label]");
-  if (label) label.textContent = `+${speedPercent - 100}% ЗАБІГ`;
+  if (label) label.textContent = `РАУНД ${game.round} · +${speedPercent - 100}%`;
+  const ability = getEquippedAbility();
+  const abilityStatus = document.querySelector("[data-ability-status]");
+  const abilityButton = document.querySelector(".ability-button");
+  const abilityIcon = document.querySelector("[data-ability-icon]");
+  const abilityLabel = document.querySelector("[data-ability-button-label]");
+  if (abilityStatus) {
+    abilityStatus.textContent = !ability ? "МАГАЗИН" : ability.id === "extra-health" ? "ПАСИВНА" : game.abilityCooldown > 0 ? `${game.abilityCooldown.toFixed(1)}с` : ability.name;
+  }
+  if (abilityButton && abilityIcon && abilityLabel) {
+    abilityIcon.textContent = ability ? ability.icon : "🛒";
+    abilityLabel.textContent = !ability ? "МАГАЗИН" : ability.id === "extra-health" ? "ПАСИВНА" : game.abilityCooldown > 0 ? `${game.abilityCooldown.toFixed(1)} С` : ability.name.toLocaleUpperCase("uk");
+    abilityButton.disabled = ability?.id === "extra-health";
+    abilityButton.setAttribute("aria-label", !ability ? "Відкрити магазин здібностей" : `Активувати: ${ability.name}`);
+  }
+  const pauseButton = document.querySelector('[data-action="pause"]');
+  if (pauseButton) {
+    pauseButton.disabled = game.onlineMode;
+    pauseButton.setAttribute("aria-label", game.onlineMode ? "Пауза недоступна в онлайн-матчі" : "Пауза");
+  }
 }
 
 function formatTime(seconds) {
@@ -845,12 +1347,14 @@ function resizeCanvas() {
   const previousWorldHeight = game.worldHeight;
   game.width = rect.width;
   game.height = rect.height;
-  game.worldWidth = game.width * 4;
-  game.worldHeight = game.height * 4;
+  game.worldWidth = game.onlineMode && game.onlineWorld ? game.onlineWorld.width : game.width * 4;
+  game.worldHeight = game.onlineMode && game.onlineWorld ? game.onlineWorld.height : game.height * 4;
   dom.canvas.width = Math.round(rect.width * ratio);
   dom.canvas.height = Math.round(rect.height * ratio);
   dom.ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-  if (!previousWidth || !previousHeight) {
+  if (game.onlineMode && game.onlineSelfId) {
+    updateCamera();
+  } else if (!previousWidth || !previousHeight) {
     game.player.x = game.worldWidth / 2;
     game.player.y = game.worldHeight / 2;
   } else {
@@ -935,6 +1439,7 @@ function playSound(type) {
 }
 
 function goToMenu() {
+  if (window.onlineClient?.room) window.onlineClient.leaveRoom();
   closeModal();
   dom.overlay.classList.add("is-hidden");
   setGameState("menu");
@@ -952,8 +1457,37 @@ document.addEventListener("click", (event) => {
     const action = actionNode.dataset.action;
     if (action === "play" || action === "restart") beginRun();
     else if (action === "show-how") openModal("how");
+    else if (action === "show-shop") openModal("shop");
     else if (action === "show-settings") openModal("settings");
     else if (action === "close-modal") closeModal();
+    else if (action === "online-create") {
+      openOnlineModal();
+      window.onlineClient?.runAction(() => window.onlineClient.createRoom());
+    } else if (action === "online-quick") {
+      openOnlineModal();
+      window.onlineClient?.runAction(() => window.onlineClient.quickJoin());
+    } else if (action === "online-join-prompt") {
+      openOnlineModal();
+      dom.onlineJoinForm?.classList.remove("is-hidden");
+      window.onlineClient?.runAction(() => window.onlineClient.connect());
+      dom.onlineJoinInput?.focus();
+    } else if (action === "online-join-submit") {
+      const code = dom.onlineJoinInput?.value.trim().toUpperCase() || "";
+      window.onlineClient?.runAction(() => window.onlineClient.joinRoom(code));
+    } else if (action === "online-ready") {
+      window.onlineClient?.toggleReady();
+    } else if (action === "online-start") {
+      window.onlineClient?.startMatch();
+    } else if (action === "online-leave") {
+      window.onlineClient?.leaveRoom();
+    } else if (action === "online-copy-code") {
+      window.onlineClient?.copyInvite(false);
+    } else if (action === "online-copy-link") {
+      window.onlineClient?.copyInvite(true);
+    } else if (action === "online-leaderboard") {
+      openModal("leaderboard");
+      window.onlineClient?.loadLeaderboard();
+    }
     else if (action === "save-name") {
       const settingsVisible = !document.querySelector('[data-modal="settings"]').classList.contains("is-hidden");
       const input = settingsVisible ? dom.settingsName : dom.nameInput;
@@ -966,6 +1500,21 @@ document.addEventListener("click", (event) => {
     } else if (action === "pause") pauseGame();
     else if (action === "resume") resumeGame();
     else if (action === "menu") goToMenu();
+    else if (action === "activate-ability") {
+      if (!getEquippedAbility()) openModal("shop");
+      else useEquippedAbility();
+    }
+    return;
+  }
+  const shopTab = event.target.closest("[data-shop-tab]");
+  if (shopTab) {
+    game.shopTab = shopTab.dataset.shopTab;
+    renderShop();
+    return;
+  }
+  const shopItem = event.target.closest("[data-shop-item]");
+  if (shopItem) {
+    purchaseOrEquip(shopItem.dataset.shopType, shopItem.dataset.shopItem);
     return;
   }
   const swatch = event.target.closest("[data-color]");
@@ -981,6 +1530,11 @@ window.addEventListener("keydown", (event) => {
   }
   const key = MOVEMENT_CODES[event.code] || event.key.toLowerCase();
   if (game.state !== "playing") return;
+  if (event.code === "Space") {
+    event.preventDefault();
+    if (!event.repeat) useEquippedAbility();
+    return;
+  }
   if (Object.values(MOVEMENT_CODES).includes(key)) {
     event.preventDefault();
     game.keys.add(key);

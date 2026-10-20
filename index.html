@@ -7,6 +7,8 @@
   <meta name="description" content="Круг проти квадратів — неонова аркада на виживання та збір кубків.">
   <title>Круг проти квадратів</title>
   <link rel="stylesheet" href="game.css">
+  <script src="online-config.js" defer></script>
+  <script src="online-client.js" defer></script>
   <script src="game.js" defer></script>
 </head>
 <body>
@@ -44,7 +46,12 @@
             </div>
           </div>
           <div class="menu-actions">
-            <button class="button button-play" type="button" data-action="play"><span>ГРАТИ</span><b>↗</b></button>
+            <button class="button button-play" type="button" data-action="play"><span>ГРАТИ СОЛО</span><b>↗</b></button>
+            <button class="button button-glass" type="button" data-action="online-quick">🌍 ГРАТИ ОНЛАЙН</button>
+            <button class="button button-glass" type="button" data-action="online-create">➕ СТВОРИТИ КІМНАТУ</button>
+            <button class="button button-glass" type="button" data-action="online-join-prompt">🔑 ПРИЄДНАТИСЯ ЗА КОДОМ</button>
+            <button class="button button-glass" type="button" data-action="online-leaderboard">🏆 ОНЛАЙН-РЕЙТИНГ</button>
+            <button class="button button-glass" type="button" data-action="show-shop">МАГАЗИН</button>
             <button class="button button-glass" type="button" data-action="show-how">ЯК ГРАТИ?</button>
             <button class="button button-glass" type="button" data-action="show-settings">НАЛАШТУВАННЯ</button>
           </div>
@@ -67,7 +74,7 @@
       <footer class="menu-footer"><span>КРУГ ПРОТИ КВАДРАТІВ</span><span>УХИЛЯЙСЯ · ЗБИРАЙ · ВИЖИВАЙ</span></footer>
     </section>
 
-    <section class="screen game-screen is-hidden" data-screen="game" aria-label="Кубкова арена">
+    <section class="screen game-screen is-hidden" data-screen="game" aria-label="Арена: Круг проти квадратів">
       <div class="game-shell">
         <div class="hud">
           <div class="hud-player">
@@ -78,6 +85,7 @@
           <div class="hud-stat"><span class="hud-label">ШВИДКІСТЬ ВОРОГІВ</span><strong data-hud-speed>100%</strong></div>
           <div class="hud-stat hp-stat"><span class="hud-label">ЗДОРОВ'Я</span><strong data-hud-hp>♥♥♥</strong></div>
           <div class="hud-stat"><span class="hud-label">ЗАБІГ / УСЬОГО</span><strong class="trophy-hud"><span data-hud-run-cups>0</span><i> / </i><span data-hud-total-cups>0</span> 🏆</strong></div>
+          <div class="hud-stat ability-status"><span class="hud-label">ЗДІБНІСТЬ</span><strong data-ability-status>—</strong></div>
           <button class="pause-button" type="button" data-action="pause" aria-label="Пауза">Ⅱ</button>
         </div>
         <div class="difficulty-row"><span>ЗРОСТАННЯ ШВИДКОСТІ · +3% ЩОХВИЛИНИ</span><div class="difficulty-meter"><i data-difficulty-meter></i></div><strong data-difficulty-label>+0% ЗАБІГ</strong></div>
@@ -88,6 +96,8 @@
             <canvas id="minimap" aria-hidden="true"></canvas>
           </div>
           <div class="arena-toast" data-toast aria-live="polite"></div>
+          <div class="online-connection is-hidden" data-online-connection role="status" aria-live="polite"></div>
+          <button class="ability-button" type="button" data-action="activate-ability"><span data-ability-icon>⚡</span><span data-ability-button-label>ЗДІБНІСТЬ</span><kbd>SPACE</kbd></button>
           <div class="game-overlay is-hidden" data-overlay aria-live="polite"></div>
           <div class="joystick" data-joystick aria-label="Віртуальний джойстик">
             <div class="joystick-ring"><div class="joystick-knob" data-joystick-knob></div></div>
@@ -100,6 +110,47 @@
   </main>
 
   <div class="modal-backdrop is-hidden" data-modal-backdrop>
+    <section class="modal-card online-modal is-hidden" data-modal="online" role="dialog" aria-modal="true" aria-labelledby="online-title">
+      <button class="modal-close" type="button" data-action="close-modal" aria-label="Закрити">×</button>
+      <p class="eyebrow"><span></span> ОНЛАЙН-АРЕНА</p>
+      <h2 id="online-title">КІМНАТА ГРАВЦІВ</h2>
+      <div class="online-status" data-online-status aria-live="polite">ПІДКЛЮЧЕННЯ…</div>
+      <div class="online-room-code is-hidden" data-online-room-code-wrap>
+        <span>КОД КІМНАТИ</span><strong data-online-room-code></strong>
+        <button class="small-button" type="button" data-action="online-copy-code">КОПІЮВАТИ</button>
+        <button class="small-button" type="button" data-action="online-copy-link">ЗАПРОСИТИ</button>
+      </div>
+      <ul class="online-players" data-online-players aria-label="Гравці кімнати"></ul>
+      <div class="online-actions">
+        <button class="button button-play" type="button" data-action="online-ready" disabled>ГОТОВИЙ</button>
+        <button class="button button-glass is-hidden" type="button" data-action="online-start" disabled>ПОЧАТИ ГРУ</button>
+        <button class="button button-glass" type="button" data-action="online-leave" disabled>ЗАЛИШИТИ КІМНАТУ</button>
+      </div>
+      <div class="online-join-form is-hidden" data-online-join-form>
+        <label class="field-label" for="online-room-code-input">КОД КІМНАТИ ДРУГА</label>
+        <div class="name-row"><input id="online-room-code-input" type="text" maxlength="6" autocomplete="off" placeholder="K7XP42"><button class="small-button" type="button" data-action="online-join-submit">ПРИЄДНАТИСЯ</button></div>
+      </div>
+      <p class="online-help">Для гри потрібен окремо запущений онлайн-сервер. Налаштування — в online-config.js.</p>
+    </section>
+    <section class="modal-card is-hidden" data-modal="leaderboard" role="dialog" aria-modal="true" aria-labelledby="leaderboard-title">
+      <button class="modal-close" type="button" data-action="close-modal" aria-label="Закрити">×</button>
+      <p class="eyebrow"><span></span> РЕЗУЛЬТАТИ СЕРВЕРА</p>
+      <h2 id="leaderboard-title">ОНЛАЙН-РЕЙТИНГ</h2>
+      <div class="leaderboard-table" data-leaderboard aria-live="polite"><p>Завантаження рейтингу…</p></div>
+      <button class="button button-glass modal-main-button" type="button" data-action="close-modal">ЗАКРИТИ</button>
+    </section>
+    <section class="modal-card shop-modal is-hidden" data-modal="shop" role="dialog" aria-modal="true" aria-labelledby="shop-title">
+      <button class="modal-close" type="button" data-action="close-modal" aria-label="Закрити">×</button>
+      <p class="eyebrow"><span></span> <span data-shop-wallet-label>ТВОЇ КУБКИ:</span> <strong data-shop-balance>0</strong> 🏆</p>
+      <h2 id="shop-title">МАГАЗИН АРЕНИ</h2>
+      <div class="shop-tabs" role="tablist" aria-label="Категорії магазину">
+        <button class="shop-tab is-active" type="button" data-shop-tab="abilities" role="tab" aria-selected="true">⚡ ЗДІБНОСТІ</button>
+        <button class="shop-tab" type="button" data-shop-tab="skins" role="tab" aria-selected="false">🎨 СКІНИ</button>
+      </div>
+      <p class="shop-hint" data-shop-hint>Купи здібність і споряджай її перед забігом.</p>
+      <div class="shop-items" data-shop-items></div>
+      <button class="button button-glass modal-main-button" type="button" data-action="close-modal">ЗАКРИТИ</button>
+    </section>
     <section class="modal-card is-hidden" data-modal="how" role="dialog" aria-modal="true" aria-labelledby="how-title">
       <button class="modal-close" type="button" data-action="close-modal" aria-label="Закрити">×</button>
       <p class="eyebrow"><span></span> КОРОТКИЙ ГАЙД</p>
