@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0c1023">
+  <meta name="description" content="Круг проти квадратів — неонова аркада на виживання та збір кубків.">
+  <title>Круг проти квадратів</title>
+  <link rel="stylesheet" href="game.css">
+  <script src="game.js" defer></script>
+</head>
+<body>
+  <div class="page-glow glow-a"></div>
+  <div class="page-glow glow-b"></div>
+  <header class="topbar">
+    <a class="brand" href="index.html" aria-label="Круг проти квадратів — головне меню"><span class="brand-icon">КК</span><span>КРУГ <span class="brand-pink">ПРОТИ КВАДРАТІВ</span></span></a>
+    <div class="arcade-status"><span class="live-dot"></span> АРЕНА НА ЗВ'ЯЗКУ</div>
+  </header>
+
+  <main>
+    <section class="screen menu-screen" data-screen="menu">
+      <div class="menu-layout">
+        <div class="menu-copy">
+          <p class="eyebrow"><span></span> АРКАДА НА ВИЖИВАННЯ</p>
+          <h1 class="game-title">КРУГ<br><span class="outline-title">ПРОТИ КВАДРАТІВ</span></h1>
+          <p class="game-subtitle">АРКАДА <span>НА ВИЖИВАННЯ</span></p>
+          <p class="intro-copy">Ухиляйся від квадратів, збирай кубки<br class="desktop-only"> і протримайся якомога довше.</p>
+          <div class="profile-card">
+            <label class="field-label" for="player-name">ЯК НАЗВЕМО ТВОЮ КУЛЬКУ?</label>
+            <div class="name-row">
+              <input id="player-name" name="player-name" type="text" maxlength="32" autocomplete="off" placeholder="Шарік" aria-describedby="name-feedback">
+              <button class="small-button" type="button" data-action="save-name">ЗБЕРЕГТИ</button>
+            </div>
+            <p class="feedback" id="name-feedback" aria-live="polite"></p>
+            <div class="color-row">
+              <span class="field-label">ОБЕРИ КОЛІР</span>
+              <div class="color-options" role="group" aria-label="Колір кульки">
+                <button class="color-swatch" type="button" data-color="#68f1e2" aria-label="Бірюзовий" title="Бірюзовий"></button>
+                <button class="color-swatch" type="button" data-color="#ff67d8" aria-label="Рожевий" title="Рожевий"></button>
+                <button class="color-swatch" type="button" data-color="#ffc857" aria-label="Золотий" title="Золотий"></button>
+                <button class="color-swatch" type="button" data-color="#8c81ff" aria-label="Фіолетовий" title="Фіолетовий"></button>
+                <button class="color-swatch" type="button" data-color="#82f06a" aria-label="Лаймовий" title="Лаймовий"></button>
+              </div>
+            </div>
+          </div>
+          <div class="menu-actions">
+            <button class="button button-play" type="button" data-action="play"><span>ГРАТИ</span><b>↗</b></button>
+            <button class="button button-glass" type="button" data-action="show-how">ЯК ГРАТИ?</button>
+            <button class="button button-glass" type="button" data-action="show-settings">НАЛАШТУВАННЯ</button>
+          </div>
+        </div>
+        <div class="menu-art" aria-label="Аркадна кулька на арені" role="img">
+          <div class="art-orbit orbit-1"></div><div class="art-orbit orbit-2"></div>
+          <div class="arena-preview">
+            <span class="preview-grid"></span>
+            <span class="preview-cup">🏆</span>
+            <span class="preview-enemy enemy-one"></span><span class="preview-enemy enemy-two"></span>
+            <span class="preview-player"><i>◉</i></span>
+            <span class="preview-name">ШАРІК</span>
+            <span class="preview-spark spark-one">✦</span><span class="preview-spark spark-two">✧</span>
+          </div>
+          <div class="stat-card stat-trophies"><span class="stat-icon">🏆</span><span class="stat-caption">УСЬОГО КУБКІВ</span><strong data-total-trophies>0</strong></div>
+          <div class="stat-card stat-best"><span class="stat-icon">⚡</span><span class="stat-caption">РЕКОРД ЧАСУ</span><strong data-best-time>00:00</strong></div>
+          <div class="art-tag"><span class="live-dot"></span> ВИЖИВИ. ЗБЕРИ. ПОВТОРИ.</div>
+        </div>
+      </div>
+      <footer class="menu-footer"><span>КРУГ ПРОТИ КВАДРАТІВ</span><span>УХИЛЯЙСЯ · ЗБИРАЙ · ВИЖИВАЙ</span></footer>
+    </section>
+
+    <section class="screen game-screen is-hidden" data-screen="game" aria-label="Кубкова арена">
+      <div class="game-shell">
+        <div class="hud">
+          <div class="hud-player">
+            <div class="avatar-mini" data-player-avatar>Ш</div>
+            <div><span class="hud-label">ГРАВЕЦЬ</span><strong data-hud-name>Шарік</strong></div>
+          </div>
+          <div class="hud-stat timer-stat"><span class="hud-label">ЧАС В АРЕНІ</span><strong data-hud-time>00:00</strong></div>
+          <div class="hud-stat"><span class="hud-label">ШВИДКІСТЬ ВОРОГІВ</span><strong data-hud-speed>100%</strong></div>
+          <div class="hud-stat hp-stat"><span class="hud-label">ЗДОРОВ'Я</span><strong data-hud-hp>♥♥♥</strong></div>
+          <div class="hud-stat"><span class="hud-label">ЗАБІГ / УСЬОГО</span><strong class="trophy-hud"><span data-hud-run-cups>0</span><i> / </i><span data-hud-total-cups>0</span> 🏆</strong></div>
+          <button class="pause-button" type="button" data-action="pause" aria-label="Пауза">Ⅱ</button>
+        </div>
+        <div class="difficulty-row"><span>ЗРОСТАННЯ ШВИДКОСТІ · +3% ЩОХВИЛИНИ</span><div class="difficulty-meter"><i data-difficulty-meter></i></div><strong data-difficulty-label>+0% ЗАБІГ</strong></div>
+        <div class="arena-wrap">
+          <canvas id="arena" tabindex="0" aria-label="Арена. Рухай кульку та уникай квадратів."></canvas>
+          <div class="minimap-panel" aria-label="Мінікарта великої арени">
+            <span>МІНІКАРТА · 4×4</span>
+            <canvas id="minimap" aria-hidden="true"></canvas>
+          </div>
+          <div class="arena-toast" data-toast aria-live="polite"></div>
+          <div class="game-overlay is-hidden" data-overlay aria-live="polite"></div>
+          <div class="joystick" data-joystick aria-label="Віртуальний джойстик">
+            <div class="joystick-ring"><div class="joystick-knob" data-joystick-knob></div></div>
+            <span>РУХ</span>
+          </div>
+        </div>
+        <div class="control-hint"><span>⌨ WASD / СТРІЛКИ</span><span>МОБІЛЬНИЙ: ДЖОЙСТИК</span><span>ESC — ПАУЗА</span></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-backdrop is-hidden" data-modal-backdrop>
+    <section class="modal-card is-hidden" data-modal="how" role="dialog" aria-modal="true" aria-labelledby="how-title">
+      <button class="modal-close" type="button" data-action="close-modal" aria-label="Закрити">×</button>
+      <p class="eyebrow"><span></span> КОРОТКИЙ ГАЙД</p>
+      <h2 id="how-title">ЯК ВИЖИТИ?</h2>
+      <div class="guide-list">
+        <p><b>01</b><span><strong>РУХАЙСЯ</strong><small>WASD або стрілки. На телефоні — перетягуй джойстик.</small></span></p>
+        <p><b>02</b><span><strong>УХИЛЯЙСЯ</strong><small>Квадрати переслідують тебе. Один дотик — мінус ♥. Відстань і ворогів видно на мінікарті.</small></span></p>
+        <p><b>03</b><span><strong>ЗБИРАЙ КУБКИ</strong><small>Підбирай золоті кубки, що з'являються на землі.</small></span></p>
+        <p><b>04</b><span><strong>ВИЖИВАЙ</strong><small>Етапів немає: кожну хвилину квадрати стають на 3% швидшими.</small></span></p>
+      </div>
+      <button class="button button-play modal-main-button" type="button" data-action="close-modal">ЗРОЗУМІЛО</button>
+    </section>
+    <section class="modal-card is-hidden" data-modal="settings" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <button class="modal-close" type="button" data-action="close-modal" aria-label="Закрити">×</button>
+      <p class="eyebrow"><span></span> ПІД ТЕБЕ</p>
+      <h2 id="settings-title">НАЛАШТУВАННЯ</h2>
+      <label class="field-label" for="settings-name">ІМ'Я КУЛЬКИ</label>
+      <div class="name-row settings-name-row">
+        <input id="settings-name" type="text" maxlength="32" autocomplete="off" placeholder="Шарік">
+        <button class="small-button" type="button" data-action="save-name">ЗБЕРЕГТИ</button>
+      </div>
+      <p class="feedback" data-settings-feedback aria-live="polite"></p>
+      <div class="settings-line"><span class="field-label">КОЛІР КУЛЬКИ</span><div class="color-options" role="group" aria-label="Колір кульки">
+        <button class="color-swatch" type="button" data-color="#68f1e2" aria-label="Бірюзовий"></button><button class="color-swatch" type="button" data-color="#ff67d8" aria-label="Рожевий"></button><button class="color-swatch" type="button" data-color="#ffc857" aria-label="Золотий"></button><button class="color-swatch" type="button" data-color="#8c81ff" aria-label="Фіолетовий"></button><button class="color-swatch" type="button" data-color="#82f06a" aria-label="Лаймовий"></button>
+      </div></div>
+      <div class="settings-line sound-line"><span><strong>ЗВУКОВІ ЕФЕКТИ</strong><small>Удар і зібрані кубки</small></span><button class="toggle-button" type="button" data-action="toggle-sound" aria-pressed="true"><i></i><span>УВІМКНЕНО</span></button></div>
+      <button class="button button-play modal-main-button" type="button" data-action="close-modal">ГОТОВО</button>
+    </section>
+  </div>
+</body>
+</html>
